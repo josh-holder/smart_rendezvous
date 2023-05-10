@@ -1,5 +1,6 @@
 control==0.9.3.post2
 jax==0.3.25
 jaxlie==1.3.3
+jaxlib==0.3.25
 matplotlib==3.7.1
 numpy==1.24.3
