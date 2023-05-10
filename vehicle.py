@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import os
 
 class Vehicle(object):
-    def __init__(self, dynamics_model, state0, n, dt=0.01):
+    def __init__(self, dynamics_model, state0, n, thruster_positions, thruster_force_vectors, dt=0.01):
         """
         INPUTS:
             dynamics_model: a function that takes in the state and control
@@ -20,14 +20,17 @@ class Vehicle(object):
 
         self.state_trajectory = [state0]
 
+        self.thruster_positions = thruster_positions
+        self.thruster_force_vectors = thruster_force_vectors
+
         #Populate A, B from the dynamics model at (state0, 0)
         self.calculateLinearControlMatrices()
 
     def calculateLinearControlMatrices(self):
         # jax.jacfwd(self.dynamics_model, argnums=(0,2))(self.state, self.n, jnp.zeros((3,1)))
         #Use JAX to calculate the A, B, and C matrices for the function self.dynamics_model
-        self.A = jax.jacfwd(self.dynamics_model, argnums=0)(self.state, self.n, jnp.zeros((3)))
-        self.B = jax.jacfwd(self.dynamics_model, argnums=2)(self.state, self.n, jnp.zeros((3)))
+        self.A = jax.jacfwd(self.dynamics_model, argnums=0)(self.state, jnp.zeros((12)), self.n, self.thruster_positions, self.thruster_force_vectors)
+        self.B = jax.jacfwd(self.dynamics_model, argnums=1)(self.state, jnp.zeros((12)), self.n, self.thruster_positions, self.thruster_force_vectors)
 
         # print(jax.jacfwd(self.dynamics_model, argnums=(0,2))(self.state, self.n, jnp.zeros((3,1))))
 
@@ -36,7 +39,7 @@ class Vehicle(object):
         Propagate the dynamics of the system forward one timestep according to
         the provided dynamics model.
         """
-        self.state = self.dynamics_model(self.state, self.n, controls, dt=self.dt)
+        self.state = self.dynamics_model(self.state, controls, self.n, self.thruster_positions, self.thruster_force_vectors, dt=self.dt)
         
         self.state_trajectory.append(self.state)
 
@@ -45,7 +48,7 @@ class Vehicle(object):
     def saveTrajectoryLog(self, file_name):
         with open(file_name, 'w+') as f: #Open the file for writing, or else create it
             print(f"Saving trajectory log to {os.path.abspath(file_name)}")
-            f.write("x,y,z,xdot,ydot,zdot\n")
+            f.write("x,y,z,xdot,ydot,zdot,q_scalar,q_x,q_y,q_z,wx,wy,wz\n")
             t = 0
             for state in self.state_trajectory:
                 f.write(",".join([str(t)]+[str(x) for x in state]) + "\n")

@@ -1,6 +1,9 @@
 from vehicle import Vehicle
-from cw_dynamics import propagateCWDynamics
+from dynamics import simpleVehicleDynamics, thrustersVehicleDynamics
 import numpy as np
+import jax.numpy as jnp
+
+from jaxlie import SO3
 
 from traj_plot import plot_trajectory
 
@@ -35,29 +38,62 @@ def _get_command_line_args():
 if __name__ == "__main__":
     args = _get_command_line_args()
 
-    #Intialize 6x1 initial state vector of all zeros
-    initial_state = np.zeros((6))
-    initial_state[0] = 10
-    initial_state[1] = 5
-    initial_state[2] = -3
+    #Intialize 12x1 initial state vector
+    initial_state = jnp.array([10.0,5.0,-3.0, 0,0,0, 1,0,0,0, 0,0,0])
 
     mu = 3.816e14 # Gravitational parameter of earth
     #initialize mean motion of earth orbit of 6378km
-    n = np.sqrt(mu/(6738000**3))
+    n = jnp.sqrt(mu/(6738000**3))
 
-    vehicle = Vehicle(propagateCWDynamics, initial_state, n, dt=args.dt)
-
-    controls = np.array(([1,0,0]))
-
-    #Compute the LQR gain matrix:
-    K, S, E = dlqr(vehicle.A, vehicle.B, np.eye(6), np.eye(3))
-
-    #loop until norm of the state vector is less than .001:
-    while np.linalg.norm(vehicle.state) > 0.001:
-        #Propagate the vehicle state
-        vehicle.propagateVehicleState(-K@vehicle.state)
+    # Define thruster positions
+    thruster_positions = jnp.array(([0.5,0,0],
+                                    [0.5,0,0],
+                                    [-0.5,0,0],
+                                    [-0.5,0,0],
+                                    [0,0.5,0],
+                                    [0,0.5,0],
+                                    [0,-0.5,0],
+                                    [0,-0.5,0],
+                                    [0,0,0.5],
+                                    [0,0,0.5],
+                                    [0,0,-0.5],
+                                    [0,0,-0.5]))
     
-    print(args.log)
+    #Define thruster force vectors, with them pointing 45 degrees from the surface normal.
+    thruster_force_vectors = -1*jnp.array(([0.707, 0.707, 0],
+                                        [0.707, -0.707, 0],
+                                        [-0.707, 0.707, 0],
+                                        [-0.707, -0.707, 0],
+                                        [0, 0.707, 0.707],
+                                        [0, 0.707, -0.707],
+                                        [0, -0.707, 0.707],
+                                        [0, -0.707, -0.707],
+                                        [0.707, 0, 0.707],
+                                        [-0.707, 0, 0.707],
+                                        [0.707, 0, -0.707],
+                                        [-0.707, 0, -0.707]))
+
+    vehicle = Vehicle(thrustersVehicleDynamics, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt)
+
+    #initialize (12,1) control vector
+    controls = jnp.array(([1,0,0,0,0,0,0,0,0,0,0,0]))
+    state = initial_state
+    for i in range(100):
+        vehicle.propagateVehicleState(controls)
+    
     vehicle.saveTrajectoryLog(args.log)
-    
+    print(args.plot_name)
     if args.plot: plot_trajectory(args.log ,args.plot_name)
+
+    # #Compute the LQR gain matrix:
+    # K, S, E = dlqr(vehicle.A, vehicle.B, np.eye(12), np.eye(12))
+
+    # #loop until norm of the state vector is less than .001:
+    # while np.linalg.norm(vehicle.state) > 0.001:
+    #     #Propagate the vehicle state
+    #     vehicle.propagateVehicleState(-K@vehicle.state)
+    
+    # print(args.log)
+    # vehicle.saveTrajectoryLog(args.log)
+    
+    # if args.plot: plot_trajectory(args.log ,args.plot_name)
