@@ -2,6 +2,7 @@ from vehicle import Vehicle
 from dynamics import simpleVehicleDynamics, thrustersVehicleDynamics
 import numpy as np
 import jax.numpy as jnp
+import jax
 
 from jaxlie import SO3
 
@@ -24,7 +25,7 @@ def _get_command_line_args():
 
     #Plotting infrastructure
     if args.seed == None: args.seed = np.random.randint(100000)
-    np.random.seed(args.seed)
+    
     if args.run_folder is None:
         args.run_folder = "runs/run_{}".format(args.seed)
     else:
@@ -35,8 +36,11 @@ def _get_command_line_args():
 if __name__ == "__main__":
     args = _get_command_line_args()
 
+    np.random.seed(args.seed)
+    jax_rng_key = jax.random.PRNGKey(args.seed)
+
     #Intialize 12x1 initial state vector
-    initial_state = jnp.array([10.0,-5.0,-3.0, 0,0,0, 1,0,0,0, 0,0,0])
+    initial_state = jnp.array([0.0,0.0,0.0, 0,0,0, 1,0,0,0, 0,0,0])
 
     mu = 3.816e14 # Gravitational parameter of earth
     #initialize mean motion of earth orbit of 6378km
@@ -73,12 +77,13 @@ if __name__ == "__main__":
     vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt)
 
     #initialize (12,1) control vector
-    controls = jnp.array(([10,0,0,0,0,0,0,0,0,0,0,0]))
+    control_choices = np.array([0,5,10])
+    controls = np.random.choice(control_choices, size=(12,))
     state = initial_state
     for i in range(100):
         vehicle.propagateVehicleState(controls)
 
-    controls = jnp.array(([0,0,10,10,0,0,0,0,0,0,0,0]))
+    controls = np.random.choice(control_choices, size=(12,))
     for i in range(100):
         vehicle.propagateVehicleState(controls)
 
@@ -90,7 +95,7 @@ if __name__ == "__main__":
 
     if args.log: vehicle.saveTrajectoryLog(args.run_folder)
     if args.plot: plot_trajectory(vehicle.state_trajectory, vehicle.control_trajectory, args.run_folder)
-    if args.video: make_video(vehicle.state_trajectory, vehicle.control_trajectory, thruster_positions, thruster_force_vectors, args.run_folder)
+    if args.video: make_video(args.run_folder, vehicle.state_trajectory, vehicle.control_trajectory, thruster_positions, thruster_force_vectors, args.dt)
 
     # #### COMPUTE FOR SIMPLE SYSTEM #######
     # initial_state = jnp.array([10.0, -5.0, 3.0, 0, 0, 0])

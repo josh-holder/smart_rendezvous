@@ -62,7 +62,7 @@ def plot_trajectory(state_traj, control_traj, run_folder_name):
 
     print(f"Saving plot to {traj_plot_name}")
 
-def make_video(state_traj, control_traj, base_thruster_positions, base_thruster_vectors, run_folder_name):
+def make_video(run_folder_name, state_traj, control_traj, base_thruster_positions, base_thruster_vectors, dt):
 
     if not os.path.exists(run_folder_name): os.mkdir(run_folder_name)
     
@@ -76,6 +76,7 @@ def make_video(state_traj, control_traj, base_thruster_positions, base_thruster_
     fig.add_axes(ax)
 
     def update(frame):
+        print(f"Creating video: frame {frame}/{state_data.shape[0]}",end='\r')
         ax.clear()
         ax.set_xlim(-10,10)
         ax.set_ylim(-10,10)
@@ -92,14 +93,22 @@ def make_video(state_traj, control_traj, base_thruster_positions, base_thruster_
         faces = create_box(xyz, quat)
         face_colors = ['red', 'green', 'blue', 'red', 'green', 'blue']
         for face, face_color in zip(faces, face_colors):
-            ax.add_collection3d(Poly3DCollection([face], facecolors=face_color, linewidths=1, alpha=.5))
+            ax.add_collection3d(Poly3DCollection([face], facecolors=face_color, linewidths=1, alpha=1))
 
         #Plot the active thruster directions
-        thruster_vectors = create_thrusters(xyz, quat, control_data[frame,:], base_thruster_positions, base_thruster_vectors)
+        thruster_vectors, thruster_positions = create_thrusters(xyz, quat, control_data[frame,:], base_thruster_positions, base_thruster_vectors)
 
-        return quiv
+        for thruster_num in range(thruster_vectors.shape[0]):
+            thruster_vector = thruster_vectors[thruster_num,:]
+            thruster_pos = thruster_positions[thruster_num,:]
+            ax.quiver(*(xyz+thruster_pos), *thruster_vector,color='green')
 
-    ani = FuncAnimation(fig, update, frames=state_data.shape[0], interval=1)
+    ani = FuncAnimation(fig, update, frames=state_data.shape[0], interval=1/dt)
+
+    animation_name = run_folder_name+'/animation.mp4'
+    ani.save(animation_name, writer='ffmpeg')
+
+    print(f"Saving plot to {animation_name}")
 
     plt.show()
 
@@ -147,14 +156,8 @@ def create_thrusters(xyz, quat, controls, thruster_positions, thruster_vectors):
     #Rotate the thruster vectors by the quaternion
     thruster_vectors = jnp.apply_along_axis(quat.apply, axis=1, arr=thruster_vectors) 
     #Scale the thruster vectors by the control input
-    print("before",thruster_vectors)
-    thruster_vectors = thruster_vectors*controls[1:].reshape(1,-1)
-    print("after",thruster_vectors)
+    thruster_vectors = (controls[1:][:,jnp.newaxis]/10)*(-1*thruster_vectors)
 
-    #Add the thruster positions to the thruster vectors
-    thruster_vectors += thruster_positions
+    thruster_positions = jnp.apply_along_axis(quat.apply, axis=1, arr=thruster_positions) 
 
-    #Add the xyz position to the thruster vectors
-    thruster_vectors += xyz
-
-    return thruster_vectors
+    return thruster_vectors, thruster_positions

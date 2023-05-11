@@ -54,7 +54,8 @@ class Vehicle(object):
         return self.state
     
     def saveTrajectoryLog(self, dir_name):
-        os.mkdir(dir_name)
+        if not os.path.exists(dir_name): os.mkdir(dir_name)
+
         state_traj = dir_name + "/state_traj.csv"
         with open(state_traj, 'w+') as f: #Open the file for writing, or else create it
             print(f"Saving trajectory log to {os.path.abspath(state_traj)}")
