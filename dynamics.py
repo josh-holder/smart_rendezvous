@@ -1,10 +1,12 @@
 import jax.numpy as jnp
 from jaxlie import SO3
 
-def simpleVehicleDynamics(state, control_input, n, dt=0.01):
+def simpleVehicleDynamics(state, control_input, n, thruster_positions=None, thruster_force_vectors=None, dt=0.01):
     """
     Dynamics model for a simple vehicle with CW dynamics
     and controls which directly impact velocities.
+
+    Accepts thruster positions and force vectors, but ignores them.
     """
     A = jnp.array(([0, 0, 0, 1, 0, 0],
                                     [0, 0, 0, 0, 1, 0],
