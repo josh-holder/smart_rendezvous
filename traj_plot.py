@@ -10,7 +10,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.pyplot as plt
 
-def plot_trajectory(state_traj, control_traj, run_folder_name):
+def plot_trajectory(state_traj, control_traj, dt, run_folder_name):
     """
     Given a file name correpsonding to a csv with the following format:
     t, x, y, z, xdot, ydot, zdot
@@ -20,13 +20,13 @@ def plot_trajectory(state_traj, control_traj, run_folder_name):
     if not os.path.exists(run_folder_name): os.mkdir(run_folder_name)
     
     data = jnp.vstack(state_traj)
-    t = data[:,0]
-    x = data[:,1]
-    y = data[:,2]
-    z = data[:,3]
-    xdot = data[:,4]
-    ydot = data[:,5]
-    zdot = data[:,6]
+    t = np.linspace(0,dt*data.shape[0],data.shape[0])
+    x = data[:,0]
+    y = data[:,1]
+    z = data[:,2]
+    xdot = data[:,3]
+    ydot = data[:,4]
+    zdot = data[:,5]
 
     plt.figure()
     plt.subplot(3,2,1)
@@ -62,12 +62,15 @@ def plot_trajectory(state_traj, control_traj, run_folder_name):
 
     print(f"Saving plot to {traj_plot_name}")
 
-def make_video(run_folder_name, state_traj, control_traj, base_thruster_positions, base_thruster_vectors, dt):
+def make_video(run_folder_name, state_traj, control_traj, base_thruster_positions, base_thruster_vectors, dt, expected_state_traj=None, desired_state=None):
 
     if not os.path.exists(run_folder_name): os.mkdir(run_folder_name)
     
-    state_data = jnp.vstack(state_traj)
+    state_data = jnp.vstack(state_traj) #stack the list of states to an array of states
+
     control_data = jnp.vstack(control_traj)
+    max_control_input = control_data.max()
+    control_data = control_data/max_control_input #normalize the control inputs
 
     #angular stuff
     fig = plt.figure()
@@ -83,8 +86,8 @@ def make_video(run_folder_name, state_traj, control_traj, base_thruster_position
         ax.set_zlim(-10,10)
 
         #Plot the heading of the spacecraft
-        xyz = state_data[frame,1:4]
-        quat = SO3(state_data[frame,7:11])
+        xyz = state_data[frame,0:3]
+        quat = SO3(state_data[frame,6:10]).normalize()
         base_vector = np.array([0.0,5.0,0.0])
         new_vect = quat.apply(base_vector)
         quiv = ax.quiver(*xyz,*new_vect)
@@ -102,6 +105,35 @@ def make_video(run_folder_name, state_traj, control_traj, base_thruster_position
             thruster_vector = thruster_vectors[thruster_num,:]
             thruster_pos = thruster_positions[thruster_num,:]
             ax.quiver(*(xyz+thruster_pos), *thruster_vector,color='green')
+
+        #Plot goal position
+        if desired_state is not None:
+            xyz = desired_state[0:3]
+            quat = SO3(desired_state[6:10]).normalize()
+            base_vector = np.array([0.0,5.0,0.0])
+            new_vect = quat.apply(base_vector)
+            quiv = ax.quiver(*xyz,*new_vect, color='green', alpha=0.5)
+
+            #Plot the body of the spacecraft
+            faces = create_box(xyz, quat)
+            for face in faces:
+                ax.add_collection3d(Poly3DCollection([face], facecolors='green', linewidths=1, alpha=0.5))
+
+        
+        #If there is an expected state trajectory, plot it
+        if expected_state_traj is not None:
+            #Plot the heading of the spacecraft
+            xyz = expected_state_traj[frame,0:3]
+            quat = SO3(expected_state_traj[frame,6:10]).normalize()
+            base_vector = np.array([0.0,5.0,0.0])
+            new_vect = quat.apply(base_vector)
+            quiv = ax.quiver(*xyz,*new_vect, alpha=0.5)
+
+            #Plot the body of the spacecraft
+            faces = create_box(xyz, quat)
+            face_colors = ['red', 'green', 'blue', 'red', 'green', 'blue']
+            for face, face_color in zip(faces, face_colors):
+                ax.add_collection3d(Poly3DCollection([face], facecolors=face_color, linewidths=1, alpha=0.5))
 
     ani = FuncAnimation(fig, update, frames=state_data.shape[0], interval=1/dt)
 
@@ -156,7 +188,7 @@ def create_thrusters(xyz, quat, controls, thruster_positions, thruster_vectors):
     #Rotate the thruster vectors by the quaternion
     thruster_vectors = jnp.apply_along_axis(quat.apply, axis=1, arr=thruster_vectors) 
     #Scale the thruster vectors by the control input
-    thruster_vectors = (controls[1:][:,jnp.newaxis]/10)*(-1*thruster_vectors)
+    thruster_vectors = (controls[:,jnp.newaxis]/10)*(-1*thruster_vectors)
 
     thruster_positions = jnp.apply_along_axis(quat.apply, axis=1, arr=thruster_positions) 
 

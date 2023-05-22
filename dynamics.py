@@ -55,7 +55,7 @@ def thrustersVehicleDynamics(state, control_input, n, thruster_positions, thrust
     Ax = jnp.hstack((state[0:6]+(cartesian_dynamics@state)*dt, q_next.wxyz, state[10:13]))
 
     ###### CALCULATE THE THRUSTER FORCES AND TORQUES ######
-    thruster_force = 1
+    thruster_force = 10
     control_input = thruster_force*control_input
 
     #Define inertia
@@ -75,7 +75,8 @@ def thrustersVehicleDynamics(state, control_input, n, thruster_positions, thrust
     #Calculate the forces in the body frame
     body_frame_forces = jnp.transpose(thruster_force_vectors)@control_input
 
-    xyz_accels = body_frame_forces/mass
+    #Calculate the accelerations in the inertial frame
+    xyz_accels = q_curr.apply(body_frame_forces/mass)
 
     thruster_force_vectors = jnp.hstack((jnp.eye(3), -jnp.eye(3)))
     thruster_force_vectors = jnp.vstack((jnp.zeros((3,6)), thruster_force_vectors))
