@@ -5,6 +5,7 @@ from traj_plot import make_video
 
 import cvxpy as cp
 import copy
+import time
 
 def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desired_state, state_size, control_size):
     """
@@ -43,6 +44,7 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
 
     control_cost_per_timestep = [(1/2)*cp.quad_form(opt_controls[i,:], control_costs) for i in range(time_horizon)]
 
+    #Final cost is 10x as expensive
     final_cost = (1/2)*cp.quad_form(opt_states[time_horizon,:] - desired_state, 10*state_costs)
 
     total_cost = cp.sum(state_cost_per_timestep) + cp.sum(control_cost_per_timestep) + final_cost
@@ -51,16 +53,14 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
 
     return prob, opt_states, opt_controls
 
-def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, dt=0.01, tolerance=0.01):
+def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, time_horizon, dt=0.01, tolerance=0.01, max_iter=1):
     """
     1. Roll out a trajectory, T_curr, using the dynamics model and random actions
     While T_curr does not end in the desired state, within some tolerance:
         1. Discretize the trajectory, linearize at each point to get A, B, C matrices
         2. Solve the constrained optimization problem using these A, B, and C matrices to get a new trajectory, T_new
         3. T_curr = T_new
-    """
-    time_horizon = 100
-    
+    """    
     state_size = initial_state.shape[0]
     control_size = vehicle.action_space_size
 
@@ -73,21 +73,30 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, d
     last_value = np.inf
     curr_value = np.inf
     value_diff = -np.inf
-    while value_diff < -tolerance:
+    while value_diff < -tolerance and iter < max_iter:
         As = []
         Bs = []
         Cs = []
-        for state, control in zip(state_traj_curr, control_traj_curr):
+        
+        start_linearization = time.time()
+        
+        
+        for i, (state, control) in enumerate(zip(state_traj_curr, control_traj_curr)):
             # print(state.shape, state)
             # print(control.shape, control)
+            # if i % 5 == 0:
             A, B, C = vehicle.calculateLinearControlMatrices(state, control)
             As.append(A)
             Bs.append(B)
             Cs.append(C)
 
+        start_optimization = time.time()
+
         optimization_prob, opt_states, opt_controls = initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desired_state, state_size, control_size)
 
         optimization_prob.solve()
+
+        print(f"Linearization time: {time.time() - start_linearization} seconds, optimization time: {time.time() - start_optimization} seconds")
 
         last_value = curr_value
         curr_value = optimization_prob.value
@@ -110,7 +119,7 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
     final_state_error = np.inf
 
-    time_horizon = 100
+    time_horizon = 50
     
     state_size = initial_state.shape[0]
     control_size = vehicle.action_space_size
@@ -120,22 +129,32 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
     controls_guess = np.random.choice(control_choices, size=(time_horizon,control_size))
 
     action_num = 1
+
+    start = time.time()
+
+    actions_to_take_btwn_opt = 3
     while final_state_error > tolerance:
         print(f"Finding optimal action {action_num}, from x,y,z {vehicle.state[0:3]}:")
         vehicle_copy = copy.deepcopy(vehicle)
-        state_traj, control_traj = find_optimal_action(vehicle_copy, initial_state, desired_state, controls_guess, dt=dt, tolerance=0.01)
+
+        max_iter = 1 if action_num > 1 else 10
+
+        state_traj, control_traj = find_optimal_action(vehicle_copy, initial_state, desired_state, controls_guess, time_horizon, dt=dt, tolerance=0.01, max_iter=max_iter)
 
         final_state_error = np.linalg.norm(state_traj[-1,:] - desired_state)
 
         print(f"Final state {state_traj[-1,:]}\n Final State error: {final_state_error}")
         print(f"Selected action: {control_traj[0,:]}")
 
-        vehicle.propagateVehicleState(control_traj[0,:])
+        for action_to_take in range(actions_to_take_btwn_opt):
+            vehicle.propagateVehicleState(control_traj[action_to_take,:])
 
         initial_state = vehicle.state
 
-        controls_guess = jnp.vstack((control_traj[1:,:], np.zeros((1,control_size))))
+        controls_guess = jnp.vstack((control_traj[1:,:], np.zeros((actions_to_take_btwn_opt,control_size))))
 
         action_num += 1 
+
+    print(f"Total optimization time: {time.time() - start} seconds")
 
     make_video("traj_opt_test", vehicle.state_trajectory, vehicle.control_trajectory, vehicle.thruster_positions, vehicle.thruster_force_vectors, dt, desired_state=desired_state)

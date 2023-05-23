@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
     vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt)
 
-    optimize_trajectory(vehicle, initial_state, jnp.array([0,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32), dt=args.dt)
+    optimize_trajectory(vehicle, initial_state, jnp.array([0,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32), dt=args.dt, tolerance=0.1)
 
     #initialize (12,1) control vector
     # control_choices = np.array([0,5,10])
