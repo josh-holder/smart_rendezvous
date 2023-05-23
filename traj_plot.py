@@ -63,7 +63,6 @@ def plot_trajectory(state_traj, control_traj, dt, run_folder_name):
     print(f"Saving plot to {traj_plot_name}")
 
 def make_video(run_folder_name, state_traj, control_traj, base_thruster_positions, base_thruster_vectors, dt, expected_state_traj=None, desired_state=None):
-
     if not os.path.exists(run_folder_name): os.mkdir(run_folder_name)
     
     state_data = jnp.vstack(state_traj) #stack the list of states to an array of states
@@ -135,7 +134,7 @@ def make_video(run_folder_name, state_traj, control_traj, base_thruster_position
             for face, face_color in zip(faces, face_colors):
                 ax.add_collection3d(Poly3DCollection([face], facecolors=face_color, linewidths=1, alpha=0.5))
 
-    ani = FuncAnimation(fig, update, frames=state_data.shape[0], interval=1/dt)
+    ani = FuncAnimation(fig, update, frames=state_data.shape[0], interval=dt*1000) #dt in milliseconds
 
     animation_name = run_folder_name+'/animation.mp4'
     ani.save(animation_name, writer='ffmpeg')

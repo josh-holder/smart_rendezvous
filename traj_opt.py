@@ -35,7 +35,7 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
     all_constraints = equality_constraints + inequality_constraints
 
     #Initialize the cost function
-    state_importances = np.array([1,1,1,0.5,0.5,0.5,1,1,1,1,1,1,1])
+    state_importances = np.array([1,1,1,0.5,0.5,0.5,10,10,10,10,1,1,1])
     # state_importances = np.array([1,1,1,0.5,0.5,0.5,0,0,0,0,0,0,0])
     state_costs = np.diag(state_importances) #np.eye(13)
     control_costs = np.eye(12)
@@ -60,14 +60,14 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, t
         1. Discretize the trajectory, linearize at each point to get A, B, C matrices
         2. Solve the constrained optimization problem using these A, B, and C matrices to get a new trajectory, T_new
         3. T_curr = T_new
-    """    
+    """
     state_size = initial_state.shape[0]
     control_size = vehicle.action_space_size
 
     vehicle.propogateVehicleTrajectory(controls_guess)
 
-    state_traj_curr = vehicle.state_trajectory
-    control_traj_curr = vehicle.control_trajectory
+    state_traj_curr = vehicle.state_trajectory[-50:]
+    control_traj_curr = vehicle.control_trajectory[-50:]
     
     iter = 0
     last_value = np.inf
@@ -80,15 +80,16 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, t
         
         start_linearization = time.time()
         
-        
         for i, (state, control) in enumerate(zip(state_traj_curr, control_traj_curr)):
             # print(state.shape, state)
             # print(control.shape, control)
-            # if i % 5 == 0:
-            A, B, C = vehicle.calculateLinearControlMatrices(state, control)
+            if i % 5 == 0:
+                A, B, C = vehicle.calculateLinearControlMatrices(state, control)
             As.append(A)
             Bs.append(B)
             Cs.append(C)
+
+        end_linearization = time.time()
 
         start_optimization = time.time()
 
@@ -96,7 +97,7 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, t
 
         optimization_prob.solve()
 
-        print(f"Linearization time: {time.time() - start_linearization} seconds, optimization time: {time.time() - start_optimization} seconds")
+        # print(f"Linearization time: {end_linearization - start_linearization} seconds, optimization time: {time.time() - start_optimization} seconds")
 
         last_value = curr_value
         curr_value = optimization_prob.value
@@ -108,7 +109,7 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, t
         state_traj_curr = vehicle.state_trajectory
         control_traj_curr = vehicle.control_trajectory
 
-        print(f"Iteration {iter} complete. Value: {optimization_prob.value}")
+        # print(f"Iteration {iter} complete. Value: {optimization_prob.value}")
         iter += 1
 
         # final_state_error = np.linalg.norm(state_traj_curr[-1,:] - desired_state)
@@ -116,7 +117,6 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, t
     return opt_states.value, opt_controls.value
     
 def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, tolerance=0.01):
-
     final_state_error = np.inf
 
     time_horizon = 50
@@ -153,8 +153,9 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
         controls_guess = jnp.vstack((control_traj[1:,:], np.zeros((actions_to_take_btwn_opt,control_size))))
 
-        action_num += 1 
+        action_num += actions_to_take_btwn_opt
 
     print(f"Total optimization time: {time.time() - start} seconds")
 
-    make_video("traj_opt_test", vehicle.state_trajectory, vehicle.control_trajectory, vehicle.thruster_positions, vehicle.thruster_force_vectors, dt, desired_state=desired_state)
+    return vehicle
+    # make_video("traj_opt_test", vehicle.state_trajectory, vehicle.control_trajectory, vehicle.thruster_positions, vehicle.thruster_force_vectors, dt, desired_state=desired_state)
