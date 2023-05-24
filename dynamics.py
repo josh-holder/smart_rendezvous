@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 from jaxlie import SO3
+import numpy as np
 
 def simpleVehicleDynamics(state, control_input, n, thruster_positions=None, thruster_force_vectors=None, dt=0.01):
     """
@@ -26,7 +27,7 @@ def simpleVehicleDynamics(state, control_input, n, thruster_positions=None, thru
 
     return state
 
-def thrustersVehicleDynamics(state, control_input, n, thruster_positions, thruster_force_vectors, dt=0.01):
+def thrustersVehicleDynamics(state, control_input, n, thruster_positions, thruster_force_vectors, dt=0.01, deterministic=False):
     """
     Dynamics model for a vehicle with an arbitrary amount of thrusters with arbitrary positions and orientations,
     and linear position dynamics obeying the Clohessy-Wiltshire equations.
@@ -83,7 +84,13 @@ def thrustersVehicleDynamics(state, control_input, n, thruster_positions, thrust
 
     Bu = jnp.hstack((jnp.zeros(3), xyz_accels, jnp.zeros(4), rpy_accels))*dt
 
-    state = Ax + Bu
+    if deterministic:
+        noise = np.zeros(13)
+    else:
+        #only noise on velocities
+        noise = np.array([0, 0, 0, 0.01, 0.01, 0.01, 0, 0, 0, 0, 0.01, 0.01, 0.01])
+
+    state = Ax + Bu + noise
 
     return state
 

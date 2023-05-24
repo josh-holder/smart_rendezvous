@@ -80,14 +80,15 @@ def make_video(run_folder_name, state_traj, control_traj, base_thruster_position
     def update(frame):
         print(f"Creating video: frame {frame}/{state_data.shape[0]}",end='\r')
         ax.clear()
-        ax.set_xlim(-10,10)
-        ax.set_ylim(-10,10)
-        ax.set_zlim(-10,10)
+        ax.set_xlim(-13,3)
+        ax.set_ylim(-3,3)
+        ax.set_zlim(-3,3)
+        ax.set_aspect('equal')
 
         #Plot the heading of the spacecraft
         xyz = state_data[frame,0:3]
         quat = SO3(state_data[frame,6:10]).normalize()
-        base_vector = np.array([0.0,5.0,0.0])
+        base_vector = np.array([5.0,0.0,0.0])
         new_vect = quat.apply(base_vector)
         quiv = ax.quiver(*xyz,*new_vect)
 
@@ -109,7 +110,7 @@ def make_video(run_folder_name, state_traj, control_traj, base_thruster_position
         if desired_state is not None:
             xyz = desired_state[0:3]
             quat = SO3(desired_state[6:10]).normalize()
-            base_vector = np.array([0.0,5.0,0.0])
+            base_vector = np.array([5.0,0.0,0.0])
             new_vect = quat.apply(base_vector)
             quiv = ax.quiver(*xyz,*new_vect, color='green', alpha=0.5)
 
@@ -124,15 +125,15 @@ def make_video(run_folder_name, state_traj, control_traj, base_thruster_position
             #Plot the heading of the spacecraft
             xyz = expected_state_traj[frame,0:3]
             quat = SO3(expected_state_traj[frame,6:10]).normalize()
-            base_vector = np.array([0.0,5.0,0.0])
+            base_vector = np.array([5.0, 0.0, 0.0])
             new_vect = quat.apply(base_vector)
-            quiv = ax.quiver(*xyz,*new_vect, alpha=0.5)
+            quiv = ax.quiver(*xyz,*new_vect, alpha=0.25)
 
             #Plot the body of the spacecraft
             faces = create_box(xyz, quat)
             face_colors = ['red', 'green', 'blue', 'red', 'green', 'blue']
             for face, face_color in zip(faces, face_colors):
-                ax.add_collection3d(Poly3DCollection([face], facecolors=face_color, linewidths=1, alpha=0.5))
+                ax.add_collection3d(Poly3DCollection([face], facecolors=face_color, linewidths=1, alpha=0.25))
 
     ani = FuncAnimation(fig, update, frames=state_data.shape[0], interval=dt*1000) #dt in milliseconds
 
@@ -184,11 +185,30 @@ def create_thrusters(xyz, quat, controls, thruster_positions, thruster_vectors):
     """
     Creates an arrow pointing in the thruster firing direction
     """
+    #Determine if we should consider a thruster as on
+    # (currently, if it's larger than the mean)
+    mean_control = controls.mean()
+    controls_on = jnp.where(controls>mean_control+0.001, 1, 0)
+
     #Rotate the thruster vectors by the quaternion
+    
+    # scalings = jnp.ones_like(controls)
+    # scalings = [1 if ctrl > mean_control else 0 for ctrl in controls]
     thruster_vectors = jnp.apply_along_axis(quat.apply, axis=1, arr=thruster_vectors) 
     #Scale the thruster vectors by the control input
-    thruster_vectors = (controls[:,jnp.newaxis]/10)*(-1*thruster_vectors)
+    # thruster_vectors = jnp.apply_along_axis(controls_on, axis=1, arr=thruster_vectors)
+    thruster_vectors = controls_on[:,jnp.newaxis] * (-1*thruster_vectors) #reverse for visualizing thruster firing
+    # thruster_vectors = jnp.where(controls > mean_control,(-1*thruster_vectors), jnp.zeros_like(thruster_vectors)) 
 
     thruster_positions = jnp.apply_along_axis(quat.apply, axis=1, arr=thruster_positions) 
 
     return thruster_vectors, thruster_positions
+
+def readLogFile(log_file):
+    """
+    Given log file from a run of this algorithm, loads data into lists for use in other plotting algorithms
+    """
+
+    data = np.loadtxt(log_file, delimiter=',',skiprows=1)
+
+    return data[:,1:] #return the data without the time index

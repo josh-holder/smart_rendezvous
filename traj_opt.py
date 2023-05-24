@@ -83,7 +83,7 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, t
         for i, (state, control) in enumerate(zip(state_traj_curr, control_traj_curr)):
             # print(state.shape, state)
             # print(control.shape, control)
-            if i % 5 == 0:
+            if i % 5 == 0: #only linearize every 5 timesteps, and just use the same linearization for each
                 A, B, C = vehicle.calculateLinearControlMatrices(state, control)
             As.append(A)
             Bs.append(B)
@@ -116,7 +116,7 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, t
     
     return opt_states.value, opt_controls.value
     
-def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, tolerance=0.01):
+def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, tolerance=0.01, verbose=False):
     final_state_error = np.inf
 
     time_horizon = 50
@@ -134,7 +134,8 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
     actions_to_take_btwn_opt = 3
     while final_state_error > tolerance:
-        print(f"Finding optimal action {action_num}, from x,y,z {vehicle.state[0:3]}:")
+        end_char = "\r" if not verbose else ""
+        print(f"Finding optimal action {action_num}, with final error {final_state_error:.2f}:", end=end_char)
         vehicle_copy = copy.deepcopy(vehicle)
 
         max_iter = 1 if action_num > 1 else 10
@@ -143,8 +144,9 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
         final_state_error = np.linalg.norm(state_traj[-1,:] - desired_state)
 
-        print(f"Final state {state_traj[-1,:]}\n Final State error: {final_state_error}")
-        print(f"Selected action: {control_traj[0,:]}")
+        if verbose:
+            print(f"Final state {state_traj[-1,:]}\n Final State error: {final_state_error}")
+            print(f"Selected action: {control_traj[0,:]}")
 
         for action_to_take in range(actions_to_take_btwn_opt):
             vehicle.propagateVehicleState(control_traj[action_to_take,:])

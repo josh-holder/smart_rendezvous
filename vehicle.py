@@ -84,7 +84,7 @@ class Vehicle(object):
             f.write("t,x,y,z,xdot,ydot,zdot,q_scalar,q_x,q_y,q_z,wx,wy,wz\n")
             t = 0
             for state in self.state_trajectory:
-                f.write(",".join([t]+[str(x) for x in state]) + "\n")
+                f.write(",".join([str(t)]+[str(x) for x in state]) + "\n")
                 t += self.dt
 
         control_traj = dir_name + "/control_traj.csv"
@@ -95,5 +95,5 @@ class Vehicle(object):
             f.write(header_str)
             t = 0
             for control in self.control_trajectory:
-                f.write(",".join([t] + [str(x) for x in control]) + "\n")
+                f.write(",".join([str(t)] + [str(x) for x in control]) + "\n")
                 t += self.dt
