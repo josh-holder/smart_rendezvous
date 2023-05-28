@@ -13,7 +13,7 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
     """
     #Define optimization variables - solving for x and u
     opt_states = cp.Variable((time_horizon+1, state_size))
-    opt_controls = cp.Variable((time_horizon, control_size))
+    opt_controls = cp.Variable((time_horizon, control_size),boolean=True)
 
     #inequality constraints
     max_control_input = 1
@@ -26,8 +26,8 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
         equality_constraints.append(opt_states[i+1,:] == As[i]@opt_states[i,:] + Bs[i]@opt_controls[i,:] + Cs[i])
 
         #Iniatilize control constraints
-        inequality_constraints.append(opt_controls[i,:] <= max_control_input)
-        inequality_constraints.append(opt_controls[i,:] >= min_control_input)
+        # inequality_constraints.append(opt_controls[i,:] <= max_control_input)
+        # inequality_constraints.append(opt_controls[i,:] >= min_control_input)
 
     #initialize the initial condition constraint
     equality_constraints.append(opt_states[0,:] == initial_state)
@@ -53,7 +53,7 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
 
     return prob, opt_states, opt_controls
 
-def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, time_horizon, dt=0.01, tolerance=0.01, max_iter=1):
+def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, time_horizon, dt=0.01, tolerance=0.01, max_iter=1, verbose=False):
     """
     1. Roll out a trajectory, T_curr, using the dynamics model and random actions
     While T_curr does not end in the desired state, within some tolerance:
@@ -97,7 +97,8 @@ def find_optimal_action(vehicle, initial_state, desired_state, controls_guess, t
 
         optimization_prob.solve()
 
-        # print(f"Linearization time: {end_linearization - start_linearization} seconds, optimization time: {time.time() - start_optimization} seconds")
+        if verbose:
+            print(f"Linearization time: {end_linearization - start_linearization} seconds, optimization time: {time.time() - start_optimization} seconds")
 
         last_value = curr_value
         curr_value = optimization_prob.value
@@ -140,7 +141,7 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
         max_iter = 1 if action_num > 1 else 10
 
-        state_traj, control_traj = find_optimal_action(vehicle_copy, initial_state, desired_state, controls_guess, time_horizon, dt=dt, tolerance=0.01, max_iter=max_iter)
+        state_traj, control_traj = find_optimal_action(vehicle_copy, initial_state, desired_state, controls_guess, time_horizon, dt=dt, tolerance=0.01, max_iter=max_iter, verbose=verbose)
 
         final_state_error = np.linalg.norm(state_traj[-1,:] - desired_state)
 

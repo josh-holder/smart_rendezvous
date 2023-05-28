@@ -77,16 +77,15 @@ if __name__ == "__main__":
                                         [0.707, 0, -0.707],
                                         [-0.707, 0, -0.707]))
 
-    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt)
+    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=True)
 
     desired_state = jnp.array([0,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32)
 
-    state_data = readLogFile("runs/simple_docking_test/state_traj.csv")
-    control_data = readLogFile("runs/simple_docking_test/control_traj.csv")
-
-    optimize_trajectory(vehicle, initial_state, desired_state, dt=args.dt, tolerance=args.tol, verbose=False)
+    optimize_trajectory(vehicle, initial_state, desired_state, dt=args.dt, tolerance=args.tol, verbose=True)
 
     # make video from existing logs
+    # state_data = readLogFile("runs/simple_docking_test/state_traj.csv")
+    # control_data = readLogFile("runs/simple_docking_test/control_traj.csv")
     # make_video("runs/simple_docking_test", state_data, control_data, thruster_positions, thruster_force_vectors, args.dt, desired_state=desired_state)
 
     if args.log: vehicle.saveTrajectoryLog(args.run_folder)

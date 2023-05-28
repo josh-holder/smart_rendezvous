@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import os
 
 class Vehicle(object):
-    def __init__(self, dynamics_model, action_space_size, state0, n, thruster_positions, thruster_force_vectors, dt=0.01):
+    def __init__(self, dynamics_model, action_space_size, state0, n, thruster_positions, thruster_force_vectors, dt=0.01, deterministic=False):
         """
         INPUTS:
             dynamics_model: a function that takes in the state and control
@@ -21,6 +21,8 @@ class Vehicle(object):
 
         self.dt = dt
         self.t = 0
+
+        self.deterministic = deterministic
 
         self.state_trajectory = [state0]
         self.control_trajectory = []
@@ -46,7 +48,7 @@ class Vehicle(object):
         Propagate the dynamics of the system forward one timestep according to
         the provided dynamics model.
         """
-        self.state = self.dynamics_model(self.state, controls, self.n, self.thruster_positions, self.thruster_force_vectors, dt=self.dt)
+        self.state = self.dynamics_model(self.state, controls, self.n, self.thruster_positions, self.thruster_force_vectors, dt=self.dt, deterministic=self.deterministic)
         
         self.t += self.dt
 
