@@ -7,13 +7,25 @@ import cvxpy as cp
 import copy
 import time
 
+def simpleOnOffControlsConvert(control_input):
+    """
+    Given a control input vector, returns on/off version of the controls
+    based on if the control inputs are >0.5 or not.
+    """
+    return jnp.where(control_input>0.5, 1.0, 0.0)
+
+def complexOnOffControlsConvert(control_input):
+    mean_control = control_input.mean()
+    return jnp.where(control_input>mean_control+0.05, 1.0, 0.0)
+
 def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desired_state, state_size, control_size):
     """
     Initialize the constraints for the optimization problem
     """
     #Define optimization variables - solving for x and u
     opt_states = cp.Variable((time_horizon+1, state_size))
-    opt_controls = cp.Variable((time_horizon, control_size),boolean=True)
+    # opt_controls = cp.Variable((time_horizon, control_size),boolean=True)
+    opt_controls = cp.Variable((time_horizon, control_size))
 
     #inequality constraints
     max_control_input = 1
@@ -26,8 +38,8 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
         equality_constraints.append(opt_states[i+1,:] == As[i]@opt_states[i,:] + Bs[i]@opt_controls[i,:] + Cs[i])
 
         #Iniatilize control constraints
-        # inequality_constraints.append(opt_controls[i,:] <= max_control_input)
-        # inequality_constraints.append(opt_controls[i,:] >= min_control_input)
+        inequality_constraints.append(opt_controls[i,:] <= max_control_input)
+        inequality_constraints.append(opt_controls[i,:] >= min_control_input)
 
     #initialize the initial condition constraint
     equality_constraints.append(opt_states[0,:] == initial_state)
@@ -134,8 +146,12 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
     start = time.time()
 
     actions_to_take_btwn_opt = 3
-    while final_state_error > tolerance:
-        end_char = "\r" if not verbose else ""
+
+    iterations_since_improvement = 0
+    best_final_state_error = np.inf
+
+    while final_state_error > tolerance and iterations_since_improvement < 20:
+        end_char = "\r" if not verbose else "\n"
         print(f"Finding optimal action {action_num}, with final error {final_state_error:.2f}:", end=end_char)
         vehicle_copy = copy.deepcopy(vehicle)
 
@@ -144,13 +160,21 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
         state_traj, control_traj = find_optimal_action(vehicle_copy, initial_state, desired_state, controls_guess, time_horizon, dt=dt, tolerance=0.01, max_iter=max_iter, verbose=verbose)
 
         final_state_error = np.linalg.norm(state_traj[-1,:] - desired_state)
+        if final_state_error < best_final_state_error:
+            iterations_since_improvement = 0
+            best_final_state_error = final_state_error
+        else:
+            iterations_since_improvement += 1
+            if verbose: print(f"Did not improve - iterations without improvement: {iterations_since_improvement}")
 
-        if verbose:
-            print(f"Final state {state_traj[-1,:]}\n Final State error: {final_state_error}")
-            print(f"Selected action: {control_traj[0,:]}")
 
         for action_to_take in range(actions_to_take_btwn_opt):
-            vehicle.propagateVehicleState(control_traj[action_to_take,:])
+            on_off_control = simpleOnOffControlsConvert(control_traj[action_to_take,:])
+            vehicle.propagateVehicleState(on_off_control)
+
+            if verbose and action_to_take == 0:
+                print(f"Final state {state_traj[-1,:]}\n Final State error: {final_state_error}")
+                print(f"Selected action: {on_off_control}")
 
         initial_state = vehicle.state
 
