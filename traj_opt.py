@@ -24,7 +24,6 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
     """
     #Define optimization variables - solving for x and u
     opt_states = cp.Variable((time_horizon+1, state_size))
-    # opt_controls = cp.Variable((time_horizon, control_size),boolean=True)
     opt_controls = cp.Variable((time_horizon, control_size))
 
     #inequality constraints
