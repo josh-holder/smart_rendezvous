@@ -47,7 +47,7 @@ def thrustersVehicleDynamics(state, control_input, n, thruster_positions, thrust
     angular_rates = state[10:13]
     angular_rate_quat = SO3(jnp.hstack((0, angular_rates)))
 
-    q_next = SO3.multiply(q_curr, SO3.exp(angular_rates*dt))
+    q_next = SO3.multiply(q_curr, SO3.exp(angular_rates*dt/2))
     
     #Concatenate all the dynamics together
     #States 1-6 (x,y,z,dx,dy,dz) are evolved by the Clohessy Wilthsire equations, multiplied by the timestep

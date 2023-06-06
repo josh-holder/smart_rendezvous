@@ -13,7 +13,7 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
     """
     #Define optimization variables - solving for x and u
     opt_states = cp.Variable((time_horizon+1, state_size))
-    opt_controls = cp.Variable((time_horizon, control_size),boolean=True)
+    opt_controls = cp.Variable((time_horizon, control_size))
 
     #inequality constraints
     max_control_input = 1
@@ -26,8 +26,8 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
         equality_constraints.append(opt_states[i+1,:] == As[i]@opt_states[i,:] + Bs[i]@opt_controls[i,:] + Cs[i])
 
         #Iniatilize control constraints
-        # inequality_constraints.append(opt_controls[i,:] <= max_control_input)
-        # inequality_constraints.append(opt_controls[i,:] >= min_control_input)
+        inequality_constraints.append(opt_controls[i,:] <= max_control_input)
+        inequality_constraints.append(opt_controls[i,:] >= min_control_input)
 
     #initialize the initial condition constraint
     equality_constraints.append(opt_states[0,:] == initial_state)
