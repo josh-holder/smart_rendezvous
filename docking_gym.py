@@ -2,6 +2,7 @@ import gym
 from gym import Env, logger, spaces, utils
 import jax.numpy as jnp
 from jaxlie import SO3
+import numpy as np
 
 class DockingGym(Env):
     metadata = {'render.modes': ['human','rgb_array']}
@@ -28,9 +29,9 @@ class DockingGym(Env):
         cartesian_dynamics = jnp.hstack((jnp.array(([0, 0, 0, 1, 0, 0],
                                     [0, 0, 0, 0, 1, 0],
                                     [0, 0, 0, 0, 0, 1],
-                                    [3*n**2, 0, 0, 0, 2*n, 0],
-                                    [0, 0, 0, -2*n, 0, 0],
-                                    [0, 0, -n**2, 0, 0, 0])), jnp.zeros((6,7))))
+                                    [3*self.n**2, 0, 0, 0, 2*self.n, 0],
+                                    [0, 0, 0, -2*self.n, 0, 0],
+                                    [0, 0, -self.n**2, 0, 0, 0])), jnp.zeros((6,7))))
     
         # #Calculate the initial quaternion
         q_curr = SO3(state[6:10])
@@ -38,13 +39,13 @@ class DockingGym(Env):
         angular_rates = state[10:13]
         angular_rate_quat = SO3(jnp.hstack((0, angular_rates)))
 
-        q_next = SO3.multiply(q_curr, SO3.exp(angular_rates*dt))
+        q_next = SO3.multiply(q_curr, SO3.exp(angular_rates*self.dt/2))
         
         #Concatenate all the dynamics together
         #States 1-6 (x,y,z,dx,dy,dz) are evolved by the Clohessy Wilthsire equations, multiplied by the timestep
         #States 7-10 (quaternion) are evolved by the discrete time quaternion dynamics
         #States 11-13 (wx,wy,wz) do not evolve over time except for the addition of the control input
-        Ax = jnp.hstack((state[0:6]+(cartesian_dynamics@state)*dt, q_next.wxyz, state[10:13]))
+        Ax = jnp.hstack((state[0:6]+(cartesian_dynamics@state)*self.dt, q_next.wxyz, state[10:13]))
 
         ###### CALCULATE THE THRUSTER FORCES AND TORQUES ######
         thruster_force = 10
@@ -57,7 +58,7 @@ class DockingGym(Env):
         mass = 1
 
         #Take rxF to get the torque vector (3x12)
-        thruster_torques = jnp.transpose(jnp.cross(thruster_positions, thruster_force_vectors))
+        thruster_torques = jnp.transpose(jnp.cross(self.thruster_positions, thruster_force_vectors))
 
         #Multiply by control input to get the torques (3,)
         control_torques = thruster_torques@control_input
@@ -73,9 +74,9 @@ class DockingGym(Env):
         thruster_force_vectors = jnp.hstack((jnp.eye(3), -jnp.eye(3)))
         thruster_force_vectors = jnp.vstack((jnp.zeros((3,6)), thruster_force_vectors))
 
-        Bu = jnp.hstack((jnp.zeros(3), xyz_accels, jnp.zeros(4), rpy_accels))*dt
+        Bu = jnp.hstack((jnp.zeros(3), xyz_accels, jnp.zeros(4), rpy_accels))*self.dt
 
-        if deterministic:
+        if self.deterministic:
             noise = np.zeros(13)
         else:
             #only noise on velocities
@@ -84,9 +85,6 @@ class DockingGym(Env):
         state = Ax + Bu + noise
 
         return state
-
-        observation, reward, done, info = self.env.step(action)
-        return observation, reward, done, info
 
     def reset(self):
         observation = self.env.reset()

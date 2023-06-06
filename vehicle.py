@@ -36,10 +36,10 @@ class Vehicle(object):
     def calculateLinearControlMatrices(self, state, control):
         # jax.jacfwd(self.dynamics_model, argnums=(0,2))(self.state, self.n, jnp.zeros((3,1)))
         #Use JAX to calculate the A, B, and C matrices for the function self.dynamics_model
-        A = jax.jacfwd(self.dynamics_model, argnums=0)(state, control, self.n, self.thruster_positions, self.thruster_force_vectors)
-        B = jax.jacfwd(self.dynamics_model, argnums=1)(state, control, self.n, self.thruster_positions, self.thruster_force_vectors)
+        A = jax.jacfwd(self.dynamics_model, argnums=0)(state, control, self.n, self.thruster_positions, self.thruster_force_vectors, dt=self.dt, deterministic=self.deterministic)
+        B = jax.jacfwd(self.dynamics_model, argnums=1)(state, control, self.n, self.thruster_positions, self.thruster_force_vectors, dt=self.dt, deterministic=self.deterministic)
 
-        C = self.dynamics_model(state, control, self.n, self.thruster_positions, self.thruster_force_vectors, dt=self.dt) - A@state - B@control 
+        C = self.dynamics_model(state, control, self.n, self.thruster_positions, self.thruster_force_vectors, dt=self.dt, deterministic=self.deterministic) - A@state - B@control 
 
         return A, B, C
 

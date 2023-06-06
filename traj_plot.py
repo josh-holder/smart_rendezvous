@@ -135,7 +135,7 @@ def make_video(run_folder_name, state_traj, control_traj, base_thruster_position
             for face, face_color in zip(faces, face_colors):
                 ax.add_collection3d(Poly3DCollection([face], facecolors=face_color, linewidths=1, alpha=0.25))
 
-    ani = FuncAnimation(fig, update, frames=state_data.shape[0], interval=dt*1000) #dt in milliseconds
+    ani = FuncAnimation(fig, update, frames=state_data.shape[0], interval=dt*1500) #dt in milliseconds
 
     animation_name = run_folder_name+'/animation.mp4'
     ani.save(animation_name, writer='ffmpeg')

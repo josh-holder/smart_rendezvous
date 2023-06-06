@@ -22,7 +22,7 @@ def _get_command_line_args():
     parser.add_argument('--log', action='store_true', help='Flag determining whether or not to save logs of the run.')
     parser.add_argument('--plot', action='store_true', help='Flag determining whether to plot the trajectory')
     parser.add_argument("--video", action='store_true', help='Flag determining whether to make a video of the trajectory')
-    parser.add_argument("--tol", type=float, default=0.01, help='Tolerance for final state error')
+    parser.add_argument("--tol", type=float, default=0.1, help='Tolerance for final state error')
 
     args = parser.parse_args()
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                                         [0.707, 0, -0.707],
                                         [-0.707, 0, -0.707]))
 
-    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=True)
+    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=False)
 
     desired_state = jnp.array([0,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32)
 
@@ -90,4 +90,5 @@ if __name__ == "__main__":
 
     if args.log: vehicle.saveTrajectoryLog(args.run_folder)
     if args.plot: plot_trajectory(vehicle.state_trajectory, vehicle.control_trajectory, args.dt, args.run_folder)
-    if args.video: make_video(args.run_folder, vehicle.state_trajectory, vehicle.control_trajectory, thruster_positions, thruster_force_vectors, args.dt, desired_state=desired_state)
+    if args.video: make_video(args.run_folder, vehicle.state_trajectory, vehicle.control_trajectory, \
+                              thruster_positions, thruster_force_vectors, args.dt, desired_state=desired_state)

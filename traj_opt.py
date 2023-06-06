@@ -7,12 +7,12 @@ import cvxpy as cp
 import copy
 import time
 
-def simpleOnOffControlsConvert(control_input):
+def simpleOnOffControlsConvert(control_input, threshold=0.5):
     """
     Given a control input vector, returns on/off version of the controls
     based on if the control inputs are >0.5 or not.
     """
-    return jnp.where(control_input>0.5, 1.0, 0.0)
+    return jnp.where(control_input>threshold, 1.0, 0.0)
 
 def complexOnOffControlsConvert(control_input):
     mean_control = control_input.mean()
@@ -169,7 +169,8 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
 
         for action_to_take in range(actions_to_take_btwn_opt):
-            on_off_control = simpleOnOffControlsConvert(control_traj[action_to_take,:])
+            # on_off_control = simpleOnOffControlsConvert(control_traj[action_to_take,:], threshold=0.1)
+            on_off_control = control_traj[action_to_take,:]
             vehicle.propagateVehicleState(on_off_control)
 
             if verbose and action_to_take == 0:
