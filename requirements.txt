@@ -1,6 +1,11 @@
 control==0.9.3.post2
+cvxpy==1.3.1
+gym==0.21.0
 jax==0.3.25
 jaxlie==1.3.3
-jaxlib==0.3.25
 matplotlib==3.7.1
 numpy==1.24.3
+rl_zoo3==1.8.0
+stable_baselines3==1.8.0
+torch==2.0.1
+wandb==0.15.4
