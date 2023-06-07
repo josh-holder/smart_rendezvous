@@ -17,7 +17,9 @@ class DockingGym(gym.Env):
         
         self.n = n
 
-        self.action_space = MultiBinary(np.shape(thruster_positions)[0])
+        # self.action_space = MultiBinary(np.shape(thruster_positions)[0])
+        self.action_space = spaces.Box(low=0, high=1, shape=(12,), dtype=np.float32)
+        print(self.action_space.sample())
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=np.shape(state0), dtype=np.float32)
 
         self.dt = dt
@@ -31,7 +33,7 @@ class DockingGym(gym.Env):
 
     def step(self, action):
         #Take only actions 
-        action = np.where(action>0.5, 1, 0)
+        # action = np.where(action>0.5, 1, 0)
 
         cartesian_dynamics = np.hstack((np.array(([0, 0, 0, 1, 0, 0],
                                     [0, 0, 0, 0, 1, 0],
@@ -124,6 +126,10 @@ class DockingGym(gym.Env):
         #and we should be rewarded
         state_diff_reward = weighted_curr_state_error - weighted_next_state_error
 
-        control_error_reward = -control.sum()/2        
+        state_reward = next_state_error@state_importances@next_state_error
 
-        return state_diff_reward + control_error_reward
+        print(state_reward, state_diff_reward)
+
+        control_error_reward = -control.sum()/2    
+
+        return (state_diff_reward + control_error_reward)*0.1

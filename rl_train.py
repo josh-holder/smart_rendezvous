@@ -263,7 +263,7 @@ def train() -> None:
 
 
     #Initialize 12x1 initial state vector (0.9725809, 0.018864, 0.0850898, 0.215616 corresponds to 0, 10, 25 XYZ euler angles)
-    initial_state = np.array([-10.0,1.0,1.0, 1.0,1.0,1.0, 0.9725809, 0.018864, 0.0850898, 0.215616, 0,0,0], dtype=np.float32)
+    initial_state = np.array([-1.0,1.0,1.0, 1.0,1.0,1.0, 0.9725809, 0.018864, 0.0850898, 0.215616, 0,0,0], dtype=np.float32)
 
     args.env_kwargs = {"state0": initial_state, "desired_state": np.array([0.0,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32), "n": n, \
                   "thruster_positions": thruster_positions, "thruster_force_vectors": thruster_force_vectors, "dt": 0.01, "deterministic": True, "tol": 0.1}
