@@ -19,7 +19,6 @@ class DockingGym(gym.Env):
 
         # self.action_space = MultiBinary(np.shape(thruster_positions)[0])
         self.action_space = spaces.Box(low=0, high=1, shape=(12,), dtype=np.float32)
-        print(self.action_space.sample())
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=np.shape(state0), dtype=np.float32)
 
         self.dt = dt
@@ -117,19 +116,18 @@ class DockingGym(gym.Env):
         next_state_error = next_state - self.desired_state
 
         #Initialize the cost function
-        state_importances = np.diag([1,1,1,0.5,0.5,0.5,10,10,10,10,1,1,1])
-
-        weighted_curr_state_error = curr_state_error@state_importances@curr_state_error
-        weighted_next_state_error = next_state_error@state_importances@next_state_error
+        state_error_importances = np.diag([1,1,1,0,0,0,10,10,10,10,0,0,0])
+        weighted_curr_state_error = curr_state_error@state_error_importances@curr_state_error
+        weighted_next_state_error = next_state_error@state_error_importances@next_state_error
 
         #If the current error is larger than the next error, then we are getting closer to the desired state
         #and we should be rewarded
         state_diff_reward = weighted_curr_state_error - weighted_next_state_error
 
-        state_reward = next_state_error@state_importances@next_state_error
 
-        print(state_reward, state_diff_reward)
+        state_importances = np.diag([1,1,1,0.5,0.5,0.5,10,10,10,10,1,1,1])
+        state_cost = next_state_error@state_importances@next_state_error*-0.1
 
         control_error_reward = -control.sum()/2    
 
-        return (state_diff_reward + control_error_reward)*0.1
+        return (state_cost + state_diff_reward + control_error_reward)*0.1
