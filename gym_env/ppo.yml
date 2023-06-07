@@ -8,3 +8,4 @@ SpacecraftDock-v0:
   gamma: 0.999
   n_epochs: 4
   ent_coef: 0.01
+  policy_kwargs: "dict(net_arch=[512,512,128])"

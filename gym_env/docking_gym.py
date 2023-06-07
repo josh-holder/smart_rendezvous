@@ -92,7 +92,7 @@ class DockingGym(gym.Env):
 
         next_state = Ax + Bu + noise
 
-        reward = self.reward_model(next_state, action)
+        reward = self.reward_model(self.state, next_state, action)
 
         done = False
         if np.linalg.norm(next_state-self.desired_state) < self.tol:
@@ -100,7 +100,6 @@ class DockingGym(gym.Env):
             reward += 100
 
         self.state = next_state
-
         return next_state, reward, done, {}
 
     def reset(self, seed=None, options=None):
@@ -108,22 +107,23 @@ class DockingGym(gym.Env):
 
         return self.state
 
-    def reward_model(self, state, control):
+    def reward_model(self, curr_state, next_state, control):
         """
         Reward model for the docking problem
         """
+        curr_state_error = curr_state - self.desired_state
+        next_state_error = next_state - self.desired_state
+
         #Initialize the cost function
-        state_importances = np.array([1,1,1,0.5,0.5,0.5,10,10,10,10,1,1,1])
-        # state_importances = np.array([1,1,1,0.5,0.5,0.5,0,0,0,0,0,0,0])
-        state_costs = np.diag(state_importances) #np.eye(13)
-        control_costs = np.eye(12)
+        state_importances = np.diag([1,1,1,0.5,0.5,0.5,10,10,10,10,1,1,1])
 
+        weighted_curr_state_error = curr_state_error@state_importances@curr_state_error
+        weighted_next_state_error = next_state_error@state_importances@next_state_error
 
-        #Reward for being close to the desired state
-        state_error = state - self.desired_state
-        state_error_cost = -0.5*state_error@state_costs@state_error
+        #If the current error is larger than the next error, then we are getting closer to the desired state
+        #and we should be rewarded
+        state_diff_reward = weighted_curr_state_error - weighted_next_state_error
 
-        #Reward for being close to the desired control
-        control_error_cost = -0.5*control@control_costs@control
+        control_error_reward = -control.sum()/2        
 
-        return state_error_cost + control_error_cost
+        return state_diff_reward + control_error_reward
