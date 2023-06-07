@@ -27,71 +27,97 @@ def simpleVehicleDynamics(state, control_input, n, thruster_positions=None, thru
 
     return state
 
+def controlAllocation(state, control, thruster_positions, thruster_directions):
+    quaternion = SO3(state[6:10])
+
+    #apply quat to each column of thruster_dir 
+    thruster_xyz_body = jnp.apply_along_axis(quaternion.apply, axis=0, arr=jnp.transpose(thruster_directions))
+    thruster_torques = jnp.transpose(jnp.cross(thruster_positions, thruster_directions))
+
+    B = jnp.vstack((thruster_xyz_body, thruster_torques))
+
+    #SVD decomposition
+    u, d, v = jnp.linalg.svd(B, full_matrices=False)
+    
+    d = jnp.diag(d)
+
+    #Calculate the pseudoinverse
+    B_pinv = v.T@jnp.linalg.inv(d)@jnp.transpose(u)
+
+    thruster_outputs = B_pinv@control
+
+    return jnp.where(thruster_outputs > 0, thruster_outputs, 0)
+
 def thrustersVehicleDynamics(state, control_input, n, thruster_positions, thruster_force_vectors, dt=0.01, deterministic=False):
     """
     Dynamics model for a vehicle with an arbitrary amount of thrusters with arbitrary positions and orientations,
     and linear position dynamics obeying the Clohessy-Wiltshire equations.
     """
-    ###### CALCULATE THE STATE EVOLUTION, WITHOUT TAKING INTO ACCOUNT THRUSTERS YET ######
-    #(6,13) matrix which defines the evolution of the x,y,z, xdot, ydot, zdot state variables over time.
-    cartesian_dynamics = jnp.hstack((jnp.array(([0, 0, 0, 1, 0, 0],
-                                    [0, 0, 0, 0, 1, 0],
-                                    [0, 0, 0, 0, 0, 1],
-                                    [3*n**2, 0, 0, 0, 2*n, 0],
-                                    [0, 0, 0, -2*n, 0, 0],
-                                    [0, 0, -n**2, 0, 0, 0])), jnp.zeros((6,7))))
-    
-    # #Calculate the initial quaternion
-    q_curr = SO3(state[6:10])
+    inner_dt = 0.05
+    for t in np.linspace(inner_dt, dt, num=int(inner_dt/0.05)):
+        thruster_input = controlAllocation(state, control_input, thruster_positions, thruster_force_vectors)
 
-    angular_rates = state[10:13]
-    angular_rate_quat = SO3(jnp.hstack((0, angular_rates)))
+        #(6,13) matrix which defines the evolution of the x,y,z, xdot, ydot, zdot state variables over time.
+        cartesian_dynamics = jnp.hstack((jnp.array(([0, 0, 0, 1, 0, 0],
+                                        [0, 0, 0, 0, 1, 0],
+                                        [0, 0, 0, 0, 0, 1],
+                                        [3*n**2, 0, 0, 0, 2*n, 0],
+                                        [0, 0, 0, -2*n, 0, 0],
+                                        [0, 0, -n**2, 0, 0, 0])), jnp.zeros((6,7))))
+        
+        # #Calculate the initial quaternion
+        q_curr = SO3(state[6:10])
 
-    q_next = SO3.multiply(q_curr, SO3.exp(angular_rates*dt/2))
-    
-    #Concatenate all the dynamics together
-    #States 1-6 (x,y,z,dx,dy,dz) are evolved by the Clohessy Wilthsire equations, multiplied by the timestep
-    #States 7-10 (quaternion) are evolved by the discrete time quaternion dynamics
-    #States 11-13 (wx,wy,wz) do not evolve over time except for the addition of the control input
-    Ax = jnp.hstack((state[0:6]+(cartesian_dynamics@state)*dt, q_next.wxyz, state[10:13]))
+        angular_rates = state[10:13]
+        angular_rate_quat = SO3(jnp.hstack((0, angular_rates)))
 
-    ###### CALCULATE THE THRUSTER FORCES AND TORQUES ######
-    thruster_force = 10
-    control_input = thruster_force*control_input
+        q_next = SO3.multiply(q_curr, SO3.exp(angular_rates*inner_dt/2))
+        
+        #Concatenate all the dynamics together
+        #States 1-6 (x,y,z,dx,dy,dz) are evolved by the Clohessy Wilthsire equations, multiplied by the timestep
+        #States 7-10 (quaternion) are evolved by the discrete time quaternion dynamics
+        #States 11-13 (wx,wy,wz) do not evolve over time except for the addition of the control input
+        Ax = jnp.hstack((state[0:6]+(cartesian_dynamics@state)*inner_dt, q_next.wxyz, state[10:13]))
 
-    #Define inertia
-    I = jnp.array(([1,0,0],
-                    [0,1,0],
-                    [0,0,1]))
-    mass = 1
+        ###### CALCULATE THE THRUSTER FORCES AND TORQUES ######
+        thruster_force = 10
+        thruster_input = thruster_force*thruster_input
 
-    #Take rxF to get the torque vector (3x12)
-    thruster_torques = jnp.transpose(jnp.cross(thruster_positions, thruster_force_vectors))
+        #Define inertia
+        I = jnp.array(([1,0,0],
+                        [0,1,0],
+                        [0,0,1]))
+        mass = 1
 
-    #Multiply by control input to get the torques (3,)
-    control_torques = thruster_torques@control_input
+        #Take rxF to get the torque vector (3x12)
+        thruster_torques = jnp.transpose(jnp.cross(thruster_positions, thruster_force_vectors))
 
-    rpy_accels = jnp.linalg.inv(I)@control_torques
+        #Multiply by control input to get the torques (3,)
+        control_torques = thruster_torques@thruster_input
 
-    #Calculate the forces in the body frame
-    body_frame_forces = jnp.transpose(thruster_force_vectors)@control_input
+        rpy_accels = jnp.linalg.inv(I)@control_torques
 
-    #Calculate the accelerations in the inertial frame
-    xyz_accels = q_curr.apply(body_frame_forces/mass)
+        #Calculate the forces in the body frame
+        body_frame_forces = jnp.transpose(thruster_force_vectors)@thruster_input
 
-    thruster_force_vectors = jnp.hstack((jnp.eye(3), -jnp.eye(3)))
-    thruster_force_vectors = jnp.vstack((jnp.zeros((3,6)), thruster_force_vectors))
+        #Calculate the accelerations in the inertial frame
+        xyz_accels = q_curr.apply(body_frame_forces/mass)
 
-    Bu = jnp.hstack((jnp.zeros(3), xyz_accels, jnp.zeros(4), rpy_accels))*dt
+        thruster_force_vectors = jnp.hstack((jnp.eye(3), -jnp.eye(3)))
+        thruster_force_vectors = jnp.vstack((jnp.zeros((3,6)), thruster_force_vectors))
 
-    if deterministic:
-        noise = np.zeros(13)
-    else:
-        #only noise on velocities
-        noise_std = np.array([0, 0, 0, 0.01, 0.01, 0.01, 0, 0, 0, 0, 0.01, 0.01, 0.01])
-        noise = np.random.normal(0, noise_std, 13)
+        Bu = jnp.hstack((jnp.zeros(3), xyz_accels, jnp.zeros(4), rpy_accels))*inner_dt
 
-    state = Ax + Bu + noise
+        if deterministic:
+            noise = np.zeros(13)
+        else:
+            #only noise on velocities
+            noise_std = np.array([0, 0, 0, 0.01, 0.01, 0.01, 0, 0, 0, 0, 0.01, 0.01, 0.01])
+            noise = np.random.normal(0, noise_std, 13)
+
+        state = Ax + Bu + noise
+
+        control_input -= jnp.hstack((xyz_accels, control_torques))
 
     return state
 

@@ -77,7 +77,7 @@ if __name__ == "__main__":
                                         [0.707, 0, -0.707],
                                         [-0.707, 0, -0.707]))
 
-    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=False)
+    vehicle = Vehicle(thrustersVehicleDynamics, 6, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=False)
 
     desired_state = jnp.array([0,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32)
 
@@ -90,5 +90,5 @@ if __name__ == "__main__":
 
     if args.log: vehicle.saveTrajectoryLog(args.run_folder)
     if args.plot: plot_trajectory(vehicle.state_trajectory, vehicle.control_trajectory, args.dt, args.run_folder)
-    if args.video: make_video(args.run_folder, vehicle.state_trajectory, vehicle.control_trajectory, \
-                              thruster_positions, thruster_force_vectors, args.dt, desired_state=desired_state)
+    # if args.video: make_video(args.run_folder, vehicle.state_trajectory, vehicle.control_trajectory, \
+    #                           thruster_positions, thruster_force_vectors, args.dt, desired_state=desired_state)

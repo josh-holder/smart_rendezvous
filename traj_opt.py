@@ -7,6 +7,8 @@ import cvxpy as cp
 import copy
 import time
 
+from jaxlie import SO3
+
 def simpleOnOffControlsConvert(control_input, threshold=0.5):
     """
     Given a control input vector, returns on/off version of the controls
@@ -27,8 +29,8 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
     opt_controls = cp.Variable((time_horizon, control_size))
 
     #inequality constraints
-    max_control_input = 1
-    min_control_input = 0
+    max_thrust_magnitude = 28.28 #N
+    max_torque_magnitude = 7.07 #N*m
 
     equality_constraints = []
     inequality_constraints = []
@@ -37,8 +39,10 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
         equality_constraints.append(opt_states[i+1,:] == As[i]@opt_states[i,:] + Bs[i]@opt_controls[i,:] + Cs[i])
 
         #Iniatilize control constraints
-        inequality_constraints.append(opt_controls[i,:] <= max_control_input)
-        inequality_constraints.append(opt_controls[i,:] >= min_control_input)
+        inequality_constraints.append(opt_controls[i,0:3] <= max_thrust_magnitude)
+        inequality_constraints.append(opt_controls[i,0:3] >= -max_thrust_magnitude)
+        inequality_constraints.append(opt_controls[i,3:] <= max_torque_magnitude)
+        inequality_constraints.append(opt_controls[i,3:] >= -max_torque_magnitude)
 
     #initialize the initial condition constraint
     equality_constraints.append(opt_states[0,:] == initial_state)
@@ -49,7 +53,7 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
     state_importances = np.array([1,1,1,0.5,0.5,0.5,10,10,10,10,1,1,1])
     # state_importances = np.array([1,1,1,0.5,0.5,0.5,0,0,0,0,0,0,0])
     state_costs = np.diag(state_importances) #np.eye(13)
-    control_costs = np.eye(12)
+    control_costs = np.eye(control_size)
 
     state_cost_per_timestep = [(1/2)*cp.quad_form(opt_states[i,:] - desired_state, state_costs) for i in range(1,time_horizon)]
 
@@ -135,9 +139,10 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
     
     state_size = initial_state.shape[0]
     control_size = vehicle.action_space_size
+    control_size = 6
 
     #Initialize a random guess at the trajectory
-    control_choices = np.array([0.0,5.0,10.0])
+    control_choices = np.array([0.0,5.0,-5.0])
     controls_guess = np.random.choice(control_choices, size=(time_horizon,control_size))
 
     action_num = 1
@@ -168,8 +173,8 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
 
         for action_to_take in range(actions_to_take_btwn_opt):
-            on_off_control = simpleOnOffControlsConvert(control_traj[action_to_take,:], threshold=0.1)
-            # on_off_control = control_traj[action_to_take,:]
+            # on_off_control = simpleOnOffControlsConvert(control_traj[action_to_take,:], threshold=0.1)
+            on_off_control = control_traj[action_to_take,:]
             vehicle.propagateVehicleState(on_off_control)
 
             if verbose and action_to_take == 0:
