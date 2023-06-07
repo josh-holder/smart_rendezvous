@@ -168,8 +168,8 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
 
         for action_to_take in range(actions_to_take_btwn_opt):
-            # on_off_control = simpleOnOffControlsConvert(control_traj[action_to_take,:], threshold=0.1)
-            on_off_control = control_traj[action_to_take,:]
+            on_off_control = simpleOnOffControlsConvert(control_traj[action_to_take,:], threshold=0.1)
+            # on_off_control = control_traj[action_to_take,:]
             vehicle.propagateVehicleState(on_off_control)
 
             if verbose and action_to_take == 0:
