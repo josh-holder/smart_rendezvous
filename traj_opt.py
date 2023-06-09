@@ -29,6 +29,7 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
     #inequality constraints
     max_control_input = 1
     min_control_input = 0
+    max_vel = 1.5
 
     equality_constraints = []
     inequality_constraints = []
@@ -39,6 +40,8 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
         #Iniatilize control constraints
         inequality_constraints.append(opt_controls[i,:] <= max_control_input)
         inequality_constraints.append(opt_controls[i,:] >= min_control_input)
+        # inequality_constraints.append(cp.norm(opt_states[i,3:6]) <= max_vel)
+        # inequality_constraints.append(cp.norm(opt_states[i,10:13]) <= max_vel)
 
     #initialize the initial condition constraint
     equality_constraints.append(opt_states[0,:] == initial_state)
@@ -46,7 +49,7 @@ def initializeOptimizationProblem(time_horizon, As, Bs, Cs, initial_state, desir
     all_constraints = equality_constraints + inequality_constraints
 
     #Initialize the cost function
-    state_importances = np.array([1,1,1,0.5,0.5,0.5,10,10,10,10,1,1,1])
+    state_importances = np.array([1,1,1,0.5,0.5,0.5,10,10,10,10,0.5,0.5,0.5])
     # state_importances = np.array([1,1,1,0.5,0.5,0.5,0,0,0,0,0,0,0])
     state_costs = np.diag(state_importances) #np.eye(13)
     control_costs = np.eye(12)
@@ -149,7 +152,7 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
     iterations_since_improvement = 0
     best_final_state_error = np.inf
 
-    while final_state_error > tolerance and iterations_since_improvement < 20:
+    while final_state_error > tolerance and iterations_since_improvement < 50:
         end_char = "\r" if not verbose else "\n"
         print(f"Finding optimal action {action_num}, with final error {final_state_error:.2f}:", end=end_char)
         vehicle_copy = copy.deepcopy(vehicle)
@@ -158,18 +161,23 @@ def optimize_trajectory(vehicle, initial_state, desired_state, dt=0.01, toleranc
 
         state_traj, control_traj = find_optimal_action(vehicle_copy, initial_state, desired_state, controls_guess, time_horizon, dt=dt, tolerance=0.01, max_iter=max_iter, verbose=verbose)
 
-        final_state_error = np.linalg.norm(state_traj[-1,:] - desired_state)
+        final_state_error = state_traj[-1,:] - desired_state
+        final_state_error = final_state_error.at[3:6].set(0)
+        final_state_error = final_state_error.at[10:13].set(0)
+
+        final_state_error = np.linalg.norm(final_state_error)
+
         if final_state_error < best_final_state_error:
             iterations_since_improvement = 0
             best_final_state_error = final_state_error
         else:
             iterations_since_improvement += 1
-            if verbose: print(f"Did not improve - iterations without improvement: {iterations_since_improvement}")
+            print(f"Did not improve - iterations without improvement: {iterations_since_improvement}")
 
 
         for action_to_take in range(actions_to_take_btwn_opt):
             on_off_control = simpleOnOffControlsConvert(control_traj[action_to_take,:], threshold=0.1)
-            # on_off_control = control_traj[action_to_take,:]
+            on_off_control = control_traj[action_to_take,:]
             vehicle.propagateVehicleState(on_off_control)
 
             if verbose and action_to_take == 0:

@@ -43,7 +43,7 @@ if __name__ == "__main__":
     jax_rng_key = jax.random.PRNGKey(args.seed)
 
     #Initialize 12x1 initial state vector (0.9725809, 0.018864, 0.0850898, 0.215616 corresponds to 0, 10, 25 XYZ euler angles)
-    initial_state = jnp.array([-10.0,1.0,1.0, 1.0,1.0,1.0, 0.9725809, 0.018864, 0.0850898, 0.215616, 0,0,0])
+    initial_state = jnp.array([-10.0,1.0,1.0, 0.0,0.0,0.0, 0.9725809, 0.018864, 0.0850898, 0.215616, 0,0,0])
 
     mu = 3.816e14 # Gravitational parameter of earth
     #initialize mean motion of earth orbit of 6378km
@@ -77,11 +77,28 @@ if __name__ == "__main__":
                                         [0.707, 0, -0.707],
                                         [-0.707, 0, -0.707]))
 
-    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=False)
+    desired_states = [jnp.array([0,0,0,1,0,0,1,0,0,0,0,0,0], dtype=np.float32),
+                      jnp.array([5,0,2,0,0,1,0.707,0,-0.707,0,0,0,0], dtype=np.float32)]
+                    #   jnp.array([0,0,4,-1,0,0,0,0,1.0,0,0,0,0], dtype=np.float32),
+                    #   jnp.array([-1,0,2,0,0,-1,0.707,0,0.707,0,0,0,0], dtype=np.float32),
+                    #   jnp.array([0,0,0,1,0,0,1,0,0,0,0,0,0], dtype=np.float32),
+                    #   jnp.array([5,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32),]
 
-    desired_state = jnp.array([0,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32)
+    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=True)
 
-    optimize_trajectory(vehicle, initial_state, desired_state, dt=args.dt, tolerance=args.tol, verbose=True)
+    quat = SO3.from_z_radians(np.pi/2)
+    print(quat.wxyz, type(quat.wxyz))
+
+    desired_state = jnp.array([,0,0,1,0,0,quat.wxyz[0],quat.wxyz[1],quat.wxyz[2],quat.wxyz[3],0,0,0], dtype=np.float32)
+
+    for theta in np.linspace(0,2*np.pi,100):
+        quat = SO3.from_rpy_radians(-np.pi/2+theta)
+        desired_pos = jnp.array([-np.cos(theta),-np.sin(theta),0])
+        desired_vel = jnp.array([-np.cos(theta),-np.sin(theta),0])
+
+    # for desired_state in desired_states:
+    #     optimize_trajectory(vehicle, vehicle.state, desired_state, dt=args.dt, tolerance=0.25, verbose=False)
+    #     print("Desired state reached!")
 
     # make video from existing logs
     # state_data = readLogFile("runs/simple_docking_test/state_traj.csv")

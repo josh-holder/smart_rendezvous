@@ -80,9 +80,9 @@ def make_video(run_folder_name, state_traj, control_traj, base_thruster_position
     def update(frame):
         print(f"Creating video: frame {frame}/{state_data.shape[0]}",end='\r')
         ax.clear()
-        ax.set_xlim(-13,3)
+        ax.set_xlim(-8,8)
         ax.set_ylim(-3,3)
-        ax.set_zlim(-3,3)
+        ax.set_zlim(-6,6)
         ax.set_aspect('equal')
 
         #Plot the heading of the spacecraft
