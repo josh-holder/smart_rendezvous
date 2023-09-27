@@ -1,8 +1,5 @@
 import numpy as np
 import jax.numpy as jnp
-
-from traj_plot import make_video
-
 import cvxpy as cp
 import copy
 import time

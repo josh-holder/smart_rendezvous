@@ -77,7 +77,7 @@ if __name__ == "__main__":
                                         [0.707, 0, -0.707],
                                         [-0.707, 0, -0.707]))
 
-    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=False)
+    vehicle = Vehicle(thrustersVehicleDynamics, 12, initial_state, n, thruster_positions, thruster_force_vectors, dt=args.dt, deterministic=True)
 
     desired_state = jnp.array([0,0,0,0,0,0,1,0,0,0,0,0,0], dtype=np.float32)
 
